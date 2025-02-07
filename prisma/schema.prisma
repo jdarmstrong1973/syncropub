@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../dev.db"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  settings         Settings?
+  articles         Article[]
+  stripeCustomerId String?
+  subscriptionStatus String   @default("solo")  // Changed from optional to required with default
+  subscriptionId    String?
+}
+
+model Settings {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  platforms      String   // Stores platforms as JSON string
+  socialMedia    String?  // Optional social media platforms
+  emailNotifications Boolean @default(false)
+  notificationEmail String?  // Optional different email for notifications
+}
+
+model Article {
+  id          String    @id @default(cuid())
+  title       String
+  status      String
+  publishDate DateTime
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  schedule    Schedule[]
+}
+
+model Schedule {
+  id          String    @id @default(cuid())
+  articleId   String
+  article     Article   @relation(fields: [articleId], references: [id])
+  platform    String
+  publishDate DateTime
+  content     String?   // Add question mark to make it optional
+}
