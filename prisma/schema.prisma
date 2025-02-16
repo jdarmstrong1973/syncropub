@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")  // Changed from DATABASE_URL
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
@@ -14,7 +13,7 @@ model User {
   settings         Settings?
   articles         Article[]
   stripeCustomerId String?
-  subscriptionStatus String   @default("solo")  // Changed from optional to required with default
+  subscriptionStatus String   @default("solo")
   subscriptionId    String?
 }
 
@@ -38,11 +37,18 @@ model Article {
   schedule    Schedule[]
 }
 
+model Platform {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  schedules Schedule[]
+}
+
 model Schedule {
   id          String    @id @default(cuid())
   articleId   String
   article     Article   @relation(fields: [articleId], references: [id])
-  platform    String
+  platformId  String
+  platform    Platform  @relation(fields: [platformId], references: [id])
   publishDate DateTime
-  content     String?   // Add question mark to make it optional
+  content     String?
 }
