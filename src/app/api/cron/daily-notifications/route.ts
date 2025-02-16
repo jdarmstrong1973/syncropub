@@ -1,77 +1,73 @@
-import { NextResponse } from 'next/server'
-import { PrismaClient, type Schedule } from '@prisma/client'
-import { sendEmail } from '@/lib/email'
+// src/app/api/cron/daily-notifications/route.ts
 
-// Singleton Prisma client
-const prisma = new PrismaClient()
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { sendScheduleEmail } from '@/lib/email'
+import { Schedule, Article, Platform } from '@prisma/client'
+
+type ScheduleWithRelations = Schedule & {
+  article: Article;
+  platform: Platform;
+}
 
 export async function GET() {
   try {
-    // Create a date object for the start and end of today
-    const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    // Get today's date at midnight
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-    // Fetch users with email notifications and their articles
-    const users = await prisma.user.findMany({
+    // Get tomorrow's date at midnight
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    // Find all schedules for today with their related articles and platforms
+    const schedules = await prisma.schedule.findMany({
       where: {
-        settings: {
-          emailNotifications: true
+        publishDate: {
+          gte: today,
+          lt: tomorrow
         }
       },
       include: {
-        settings: true,
-        articles: {
-          where: {
-            schedule: {
-              some: {
-                publishDate: {
-                  gte: startOfDay,
-                  lt: endOfDay
-                }
-              }
-            }
-          },
-          include: {
-            schedule: true
-          }
-        }
+        article: true,
+        platform: true
       }
     })
 
-    // Process each user
-    for (const user of users) {
-      // Collect schedules for today with their associated articles
-      const todaysSchedule = user.articles.flatMap(article => 
-        article.schedule
-          .filter(schedule => {
-            const scheduleDate = new Date(schedule.publishDate)
-            return (
-              scheduleDate >= startOfDay && 
-              scheduleDate < endOfDay
-            )
-          })
-          .map(schedule => ({
-            ...schedule,
-            article: article
-          }))
-      )
-
-      // Send email if there are schedules today
-      if (todaysSchedule.length > 0) {
-        const emailAddress = user.settings?.notificationEmail || user.email
-
-        if (emailAddress) {
-          await sendEmail(emailAddress, todaysSchedule)
+    // Group schedules by user
+    const userSchedules = new Map<string, ScheduleWithRelations[]>()
+    
+    for (const schedule of schedules) {
+      const user = await prisma.user.findUnique({
+        where: { id: schedule.article.userId },
+        include: {
+          settings: true
         }
+      })
+
+      if (user?.settings?.emailNotifications) {
+        const email = user.settings.notificationEmail || user.email
+        if (!userSchedules.has(email)) {
+          userSchedules.set(email, [])
+        }
+        userSchedules.get(email)?.push(schedule as ScheduleWithRelations)
       }
     }
 
-    return NextResponse.json({ success: true })
+    // Send emails to each user
+    for (const [email, schedules] of userSchedules.entries()) {
+      await sendScheduleEmail(schedules, email)
+    }
+
+    return NextResponse.json({
+      message: 'Daily notifications sent successfully',
+      schedulesProcessed: schedules.length
+    })
   } catch (error) {
-    console.error('Error sending notifications:', error)
-    return NextResponse.json({ error: 'Failed to send notifications' }, { status: 500 })
+    console.error('Error sending daily notifications:', error)
+    return NextResponse.json(
+      { error: 'Failed to send daily notifications' },
+      { status: 500 }
+    )
   }
 }
-
-export {}
