@@ -1,28 +1,27 @@
 // src/app/api/checkout/route.ts
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import Stripe from 'stripe'
 import { PrismaClient } from '@prisma/client'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia'  // Update to latest version
+  apiVersion: '2025-01-27.acacia'
 })
 
 const prisma = new PrismaClient()
 
 export async function POST(request: Request) {
   try {
-    // Verify user is authenticated
-    const session = await getServerSession(authOptions)
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Get the body to determine subscription type
     const { subscriptionType } = await request.json()
 
-    // Find the user
     const user = await prisma.user.findUnique({
       where: { email: session.user.email }
     })
@@ -31,12 +30,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Choose the appropriate price ID based on subscription type
     const priceId = subscriptionType === 'annual' 
       ? process.env.STRIPE_PRIME_ANNUAL_PRICE_ID 
       : process.env.STRIPE_PRIME_MONTHLY_PRICE_ID
 
-    // Create Stripe Checkout Session
     const stripeSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -46,8 +43,8 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXTAUTH_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-cancel_url: `${process.env.NEXTAUTH_URL}/auth/settings`,  // Update path to match your app
+      success_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/settings`,
       client_reference_id: user.id,
       metadata: {
         userId: user.id,

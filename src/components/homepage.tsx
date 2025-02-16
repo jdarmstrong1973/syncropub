@@ -1,8 +1,9 @@
 'use client'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Schedule {
   id: string
@@ -33,7 +34,10 @@ const formatDate = (dateString: string) => {
 }
 
 export default function Homepage() {
-  const { data: session } = useSession()
+  const session = useSession()
+  const supabase = useSupabaseClient()
+  const router = useRouter()
+  
   const [subscriptionStatus, setSubscriptionStatus] = useState<'solo' | 'prime'>('solo')
   const [activeTab, setActiveTab] = useState<'add' | 'schedule' | 'social'>('add')
   const [articles, setArticles] = useState<Article[]>([])
@@ -49,11 +53,19 @@ export default function Homepage() {
     };
   }>({})
 
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (!error) {
+      router.push('/auth/signin')
+    }
+  }
+
   useEffect(() => {
     if (session) {
       fetchArticles()
     }
   }, [session])
+
   useEffect(() => {
     if (session) {
       const fetchSubscriptionStatus = async () => {
@@ -69,6 +81,7 @@ export default function Homepage() {
       fetchSubscriptionStatus()
     }
   }, [session])
+
   const fetchArticles = async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/articles`)
@@ -89,7 +102,6 @@ export default function Homepage() {
     setIsLoading(true)
   
     try {
-      // If status is draft, set publishDate to current date
       const finalPublishDate = status === 'draft' ? new Date().toISOString().split('T')[0] : publishDate
   
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/articles`, {
@@ -139,79 +151,80 @@ export default function Homepage() {
 
   return (
     <main className="min-h-screen p-8 bg-gray-50">
-  <div className="max-w-4xl mx-auto">
-    <div className="flex justify-between items-center mb-8">
-      <div className="flex items-center gap-3">
-        <Image 
-          src="/images/syncropub.jpg"
-          alt="SyncroPub"
-          width={200}
-          height={200}
-          className="object-contain"
-        />
-        <div>
-          <h1 className="text-3xl font-bold mb-1">SyncroPub</h1>
-          <p className="text-sm text-gray-600">
-            {subscriptionStatus === 'prime' ? 'Prime' : 'Solo'} Plan
-          </p>
-        </div>
-      </div>
-      </div>
-      {/* Navigation Tabs */}
-<nav className="flex justify-between items-center mb-8">
-  <div className="flex space-x-4">
-    <button
-      onClick={() => setActiveTab('add')}
-      className={`px-4 py-2 rounded-t-lg ${
-        activeTab === 'add'
-          ? 'bg-white shadow-md font-semibold'
-          : 'bg-gray-100'
-      }`}
-    >
-      Add Article
-    </button>
-    <button
-      onClick={() => setActiveTab('schedule')}
-      className={`px-4 py-2 rounded-t-lg ${
-        activeTab === 'schedule'
-          ? 'bg-white shadow-md font-semibold'
-          : 'bg-gray-100'
-      }`}
-    >
-      Publishing Schedule
-    </button>
-    <button
-      onClick={() => setActiveTab('social')}
-      className={`px-4 py-2 rounded-t-lg ${
-        activeTab === 'social'
-          ? 'bg-white shadow-md font-semibold'
-          : 'bg-gray-100'
-      }`}
-    >
-      Social Media
-    </button>
-  </div>
-</nav>
-      <div className="flex items-center space-x-4">
-        {subscriptionStatus !== 'prime' && (
-          <button
-            onClick={() => {/* we'll add upgrade logic later */}}
-            className="text-purple-600 hover:text-purple-700 font-medium"
-          >
-            Upgrade to Prime
-          </button>
-        )}
-                        <Link href="/auth/settings" className="text-purple-600 hover:text-purple-700">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-3">
+            <Image 
+              src="/images/syncropub.jpg"
+              alt="SyncroPub"
+              width={200}
+              height={200}
+              className="object-contain"
+            />
+            <div>
+              <h1 className="text-3xl font-bold mb-1">SyncroPub</h1>
+              <p className="text-sm text-gray-600">
+                {subscriptionStatus === 'prime' ? 'Prime' : 'Solo'} Plan
+              </p>
+            </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            {subscriptionStatus !== 'prime' && (
+              <button
+                onClick={() => {/* we'll add upgrade logic later */}}
+                className="text-purple-600 hover:text-purple-700 font-medium"
+              >
+                Upgrade to Prime
+              </button>
+            )}
+            <Link href="/auth/settings" className="text-purple-600 hover:text-purple-700">
               Profile Settings
             </Link>
             <button
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className="text-purple-600 hover:text-purple-700"
             >
               Logout
             </button>
           </div>
         </div>
+
+        {/* Navigation Tabs */}
+        <nav className="flex justify-between items-center mb-8">
+          <div className="flex space-x-4">
+            <button
+              onClick={() => setActiveTab('add')}
+              className={`px-4 py-2 rounded-t-lg ${
+                activeTab === 'add'
+                  ? 'bg-white shadow-md font-semibold'
+                  : 'bg-gray-100'
+              }`}
+            >
+              Add Article
+            </button>
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`px-4 py-2 rounded-t-lg ${
+                activeTab === 'schedule'
+                  ? 'bg-white shadow-md font-semibold'
+                  : 'bg-gray-100'
+              }`}
+            >
+              Publishing Schedule
+            </button>
+            <button
+              onClick={() => setActiveTab('social')}
+              className={`px-4 py-2 rounded-t-lg ${
+                activeTab === 'social'
+                  ? 'bg-white shadow-md font-semibold'
+                  : 'bg-gray-100'
+              }`}
+            >
+              Social Media
+            </button>
+          </div>
+        </nav>
 
         {/* Add Article Tab */}
         {activeTab === 'add' && (
