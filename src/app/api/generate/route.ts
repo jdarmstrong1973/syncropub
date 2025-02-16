@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({
@@ -8,7 +8,29 @@ const anthropic = new Anthropic({
 })
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll().map((cookie) => ({
+            name: cookie.name,
+            value: cookie.value,
+          }))
+        },
+        setAll(cookies) {
+          cookies.forEach(({ name, value, options }) => {
+            cookieStore.set({ name, value, ...options })
+          })
+        }
+      }
+    }
+  )
+
+  const { data: { session } } = await supabase.auth.getSession()
+
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
@@ -39,8 +61,13 @@ Format the response as a single cohesive post with appropriate line breaks, emoj
         { role: "user", content: prompt }
       ]
     })
-
-    return NextResponse.json({ content: completion.content[0].text })
+    
+    // Safely extract the content
+    const responseContent = completion.content.find(
+      block => block.type === 'text'
+    )?.text ?? ''
+    
+    return NextResponse.json({ content: responseContent })
   } catch (error) {
     console.error('Error generating content:', error)
     return NextResponse.json({ error: 'Failed to generate content' }, { status: 500 })
