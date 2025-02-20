@@ -5,6 +5,13 @@ import { NextRequest } from 'next/server'
 
 const prisma = new PrismaClient()
 
+// Define a type for schedule items
+interface ScheduleItem {
+  platform: string;
+  publishDate: string;
+  content?: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { userId } = getAuth(request)
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
         publishDate: new Date(publishDate),
         userId: userId,
         schedule: {
-          create: schedule.map((item: any) => ({
+          create: schedule.map((item: ScheduleItem) => ({
             platform: item.platform,
             publishDate: new Date(item.publishDate),
             content: item.content
@@ -91,7 +98,7 @@ export async function PUT(request: NextRequest) {
         status,
         publishDate: new Date(publishDate),
         schedule: {
-          create: schedule.map((item: any) => ({
+          create: schedule.map((item: ScheduleItem) => ({
             platform: item.platform,
             publishDate: new Date(item.publishDate),
             content: item.content
