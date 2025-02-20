@@ -1,41 +1,48 @@
-// src/app/api/checkout/route.ts
-import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import Stripe from 'stripe'
+import { NextResponse } from 'next/server'
+import { getAuth } from '@clerk/nextjs/server'
+import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia'
-})
-
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 const prisma = new PrismaClient()
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session?.user?.email) {
+    const { userId } = getAuth(request)
+    
+    if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { subscriptionType } = await request.json()
-
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { id: userId }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const priceId = subscriptionType === 'annual' 
-      ? process.env.STRIPE_PRIME_ANNUAL_PRICE_ID 
-      : process.env.STRIPE_PRIME_MONTHLY_PRICE_ID
+    const { priceId } = await request.json()
 
-    const stripeSession = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+    // Create Stripe customer if not exists
+    let customerId = user.stripeCustomerId
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email
+      })
+      customerId = customer.id
+
+      // Save customer ID to user
+      await prisma.user.update({
+        where: { id: userId },
+        data: { stripeCustomerId: customerId }
+      })
+    }
+
+    // Create the checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ['card'],
       line_items: [
         {
@@ -43,23 +50,15 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/settings`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings`,
       client_reference_id: user.id,
-      metadata: {
-        userId: user.id,
-        subscriptionType: subscriptionType
-      }
+      mode: 'subscription',
     })
 
-    return NextResponse.json({ 
-      sessionId: stripeSession.id,
-      url: stripeSession.url 
-    })
+    return NextResponse.json({ sessionId: session.id })
   } catch (error) {
-    console.error('Stripe Checkout Error:', error)
-    return NextResponse.json({ 
-      error: 'Failed to create checkout session' 
-    }, { status: 500 })
+    console.error('Error creating checkout session:', error)
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
   }
 }

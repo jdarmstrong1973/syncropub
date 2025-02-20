@@ -1,21 +1,20 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { getAuth } from '@clerk/nextjs/server'
 import { PrismaClient } from '@prisma/client'
+import { NextRequest } from 'next/server'
 
 const prisma = new PrismaClient()
 
-export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
+export async function GET(request: NextRequest) {
+  const { userId } = getAuth(request)
   
-  if (!session?.user?.email) {
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
   try {
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { id: userId }
     })
 
     if (!user) {

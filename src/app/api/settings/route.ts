@@ -1,22 +1,18 @@
 // src/app/api/settings/route.ts
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-
-const prisma = new PrismaClient()
+import { auth } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/db'
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
+  const { userId } = await auth()
 
-  if (!session?.user?.email) {
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
   try {
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: userId },
       include: { settings: true }
     })
 
@@ -38,10 +34,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
+  const { userId } = await auth()
 
-  if (!session?.user?.email) {
+  if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
@@ -57,9 +52,10 @@ export async function POST(request: Request) {
     const socialMediaJson = JSON.stringify(socialMedia)
 
     const user = await prisma.user.upsert({
-      where: { email: session.user.email },
+      where: { id: userId },
       create: { 
-        email: session.user.email,
+        id: userId,
+        email: notificationEmail,
         settings: { 
           create: { 
             platforms: platformsJson,

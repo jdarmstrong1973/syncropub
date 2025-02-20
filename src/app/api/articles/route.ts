@@ -1,116 +1,141 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { getAuth } from '@clerk/nextjs/server'
+import { NextRequest } from 'next/server'
 
 const prisma = new PrismaClient()
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userId } = getAuth(request)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const articles = await prisma.article.findMany({
       where: {
-        userId: session.user.id
+        userId: userId
       },
       include: {
         schedule: true
       }
     })
 
-    return NextResponse.json({ articles })
+    return NextResponse.json(articles)
   } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('Error fetching articles:', error)
+    return NextResponse.json({ error: 'Failed to fetch articles' }, { status: 500 })
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userId } = getAuth(request)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { title, status, publishDate } = body
+    const { title, status, publishDate, schedule } = await request.json()
 
     const article = await prisma.article.create({
       data: {
         title,
         status,
-        publishDate,
-        userId: session.user.id
+        publishDate: new Date(publishDate),
+        userId: userId,
+        schedule: {
+          create: schedule.map((item: any) => ({
+            platform: item.platform,
+            publishDate: new Date(item.publishDate),
+            content: item.content
+          }))
+        }
+      },
+      include: {
+        schedule: true
       }
     })
 
-    return NextResponse.json({ article })
+    return NextResponse.json(article)
   } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('Error creating article:', error)
+    return NextResponse.json({ error: 'Failed to create article' }, { status: 500 })
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userId } = getAuth(request)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { action, articleId } = body
+    const { id, title, status, publishDate, schedule } = await request.json()
 
-    if (action === 'delete_article') {
-      await prisma.article.delete({
-        where: {
-          id: articleId,
-          userId: session.user.id
-        }
-      })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { articleId, scheduleId } = body
-
-    await prisma.schedule.delete({
+    // Delete existing schedules to replace them
+    await prisma.schedule.deleteMany({
       where: {
-        id: scheduleId,
-        articleId: articleId,
-        article: {
-          userId: session.user.id
-        }
+        articleId: id
       }
     })
 
-    return NextResponse.json({ success: true })
+    const article = await prisma.article.update({
+      where: {
+        id: id
+      },
+      data: {
+        title,
+        status,
+        publishDate: new Date(publishDate),
+        schedule: {
+          create: schedule.map((item: any) => ({
+            platform: item.platform,
+            publishDate: new Date(item.publishDate),
+            content: item.content
+          }))
+        }
+      },
+      include: {
+        schedule: true
+      }
+    })
+
+    return NextResponse.json(article)
   } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('Error updating article:', error)
+    return NextResponse.json({ error: 'Failed to update article' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { userId } = getAuth(request)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const { id } = await request.json()
+
+    // Delete associated schedules first
+    await prisma.schedule.deleteMany({
+      where: {
+        articleId: id
+      }
+    })
+
+    const article = await prisma.article.delete({
+      where: {
+        id: id
+      }
+    })
+
+    return NextResponse.json(article)
+  } catch (error) {
+    console.error('Error deleting article:', error)
+    return NextResponse.json({ error: 'Failed to delete article' }, { status: 500 })
   }
 }
