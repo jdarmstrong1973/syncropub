@@ -1,8 +1,6 @@
 import {
   ClerkProvider,
-  SignInButton,
   SignedIn,
-  SignedOut,
   UserButton
 } from '@clerk/nextjs'
 import './globals.css'
@@ -17,9 +15,6 @@ export default function RootLayout({
       <html lang="en">
         <body>
           <header className="p-4 flex justify-end">
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
             <SignedIn>
               <UserButton afterSignOutUrl="/auth/signin" />
             </SignedIn>
