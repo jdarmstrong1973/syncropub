@@ -47,6 +47,22 @@ export default function Homepage() {
     };
   }>({})
 
+  // Add the missing fetchArticles function
+  const fetchArticles = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/articles');
+      if (response.ok) {
+        const data = await response.json();
+        setArticles(data);
+      }
+    } catch (error) {
+      console.error('Error fetching articles:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isLoaded && !user) {
       router.push('/auth/signin')
@@ -74,8 +90,6 @@ export default function Homepage() {
       fetchSubscriptionStatus()
     }
   }, [user])
-
-  // ... rest of your existing component code ...
 
   if (!isLoaded || !user) {
     return (
@@ -119,8 +133,13 @@ export default function Homepage() {
             <UserButton />
           </div>
         </div>
-
-        {/* Rest of your existing JSX ... */}
+        
+        {/* Placeholder for your tabs and content sections */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-center text-gray-600">
+            Welcome to SyncroPub! Your article management system.
+          </p>
+        </div>
       </div>
     </main>
   )
