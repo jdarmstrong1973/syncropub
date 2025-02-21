@@ -12,9 +12,8 @@ export default function SignInPage() {
             card: "shadow-lg rounded-lg"
           }
         }}
-        routing={{
-          afterSignIn: '/'
-        }}
+        path="/"
+        routing="path"
       />
     </div>
   )
