@@ -11,12 +11,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        elements: {
+          userButtonBox: "mx-auto"
+        }
+      }}
+    >
       <html lang="en">
         <body>
           <header className="p-4 flex justify-end">
             <SignedIn>
-              <UserButton afterSignOutUrl="/auth/signin" />
+              <UserButton />
             </SignedIn>
           </header>
           {children}
