@@ -18,6 +18,9 @@ export default function RootLayout({
       userButtonBox: "mx-auto"
     }
   }}
+  signInUrl="/signin"
+  signUpUrl="/signin"
+  signInFallbackRedirectUrl="/"
 >
       <html lang="en">
         <body>
