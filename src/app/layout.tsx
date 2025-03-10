@@ -12,14 +12,13 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      clerkJSUrl="https://clerk.browser.js.clerk.com/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
-      appearance={{
-        elements: {
-          userButtonBox: "mx-auto"
-        }
-      }}
-    >
+  publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+  appearance={{
+    elements: {
+      userButtonBox: "mx-auto"
+    }
+  }}
+>
       <html lang="en">
         <body>
           <header className="p-4 flex justify-end">
