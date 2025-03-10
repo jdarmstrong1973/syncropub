@@ -13,7 +13,7 @@ export default function RootLayout({
   return (
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      clerkJSUrl="https://cdn.clerk.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+      clerkJSUrl="https://clerk.browser.js.clerk.com/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
       appearance={{
         elements: {
           userButtonBox: "mx-auto"
