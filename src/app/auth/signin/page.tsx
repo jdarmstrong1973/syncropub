@@ -1,6 +1,4 @@
-'use client'
-
-import { SignIn } from "@clerk/nextjs"
+import { SignIn } from "@clerk/nextjs";
 
 export default function SignInPage() {
   return (
@@ -12,8 +10,10 @@ export default function SignInPage() {
             card: "shadow-lg rounded-lg"
           }
         }}
+        routing="path"
+        path="/auth/signin"
         fallbackRedirectUrl="/"
       />
     </div>
-  )
+  );
 }
